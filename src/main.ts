@@ -3,7 +3,7 @@ import './style.css';
 import type { Chart, Entry, Draft, Profile, Settings, GenerationRequest, Result } from './types';
 import { defaults } from './types';
 import { LibraryStore, profileKey } from './store';
-import { Engine, MOTION_DELAY, type Judgment } from './engine';
+import { Engine, type Judgment } from './engine';
 import { MusicClock } from './audio';
 import { PlayInput } from './input';
 import { Renderer, drawPoster } from './renderer';
@@ -627,7 +627,7 @@ function frame(stamp: number) {
         $('offset').textContent = '';
       }
     }
-    if (raw >= runRange.end + MOTION_DELAY) {
+    if (raw >= runRange.end) {
       finish();
       return;
     }

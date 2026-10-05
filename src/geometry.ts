@@ -97,3 +97,15 @@ export function chartRevision(chart: unknown): string {
         : value;
   return hash(JSON.stringify(ordered(clean)));
 }
+
+// Branches share a short approach so input can arrive slightly after the beat
+// without changing the ball's current position or delaying the whole picture.
+export const FORK_INPUT_GRACE = 0.08;
+export function forkDecisionEnd(f: import('./types').Fork): number {
+  let end = f.start;
+  for (let i = 0; i < f.keysA.length; i++) {
+    if (distance(f.keysA[i], f.keysB[i]) > 1e-8) break;
+    end = f.keysA[i].t;
+  }
+  return Math.min(end, f.start + FORK_INPUT_GRACE);
+}

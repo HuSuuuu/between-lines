@@ -1,8 +1,5 @@
 import type { Chart, Note, Vec, Result } from './types';
-import { position, clamp } from './geometry';
-// A fixed visual delay lets on-beat branch gestures arrive before the rendered ball
-// crosses the junction. It never changes with success, misses, or camera motion.
-export const MOTION_DELAY = 0.08;
+import { position, clamp, forkDecisionEnd } from './geometry';
 export type Judgment = {
   id: string;
   kind: Note['kind'];
@@ -25,6 +22,13 @@ export class Engine {
     readonly difficulty = 'standard',
   ) {
     this.keys = chart.tracks.map((t) => ({ id: t.id, keys: t.keys.map((k) => ({ ...k })) }));
+    for (const fork of chart.forks) {
+      const keys = this.keys[fork.track].keys;
+      for (const key of fork.keysA) {
+        if (!keys.some((k) => Math.abs(k.t - key.t) < 1e-8)) keys.push({ ...key });
+      }
+      keys.sort((a, b) => a.t - b.t);
+    }
     this.events =
       difficulty === 'basic'
         ? chart.events
@@ -59,7 +63,8 @@ export class Engine {
         (e) =>
           !this.judged.has(e.id) &&
           Math.abs(e.t - t) <= this.goodWindow + (e.kind === 'swipe' ? 0.04 : 0) &&
-          (e.kind !== 'swipe' || t <= e.t + MOTION_DELAY),
+          (e.kind !== 'swipe' ||
+            t <= forkDecisionEnd(this.chart.forks.find((f) => f.eventId === e.id)!)),
       )
       .sort((a, b) => Math.abs(a.t - t) - Math.abs(b.t - t))[0];
   }
@@ -67,7 +72,12 @@ export class Engine {
     for (const e of this.events) {
       if (this.judged.has(e.id)) continue;
       if (auto && t >= e.t) this.commit(e, 'PERFECT', e.t, 0, e.kind === 'swipe' ? 'A' : undefined);
-      else if (t > e.t + (e.kind === 'swipe' ? MOTION_DELAY : this.goodWindow))
+      else if (
+        t >
+        (e.kind === 'swipe'
+          ? forkDecisionEnd(this.chart.forks.find((f) => f.eventId === e.id)!)
+          : e.t + this.goodWindow)
+      )
         this.commit(e, 'MISS', e.t + this.goodWindow, this.goodWindow);
     }
   }
@@ -101,7 +111,7 @@ export class Engine {
       if (!f) return undefined;
       choice = direction === f.directionA ? 'A' : direction === f.directionB ? 'B' : undefined;
       correct = !!choice;
-      if (t > e.t + MOTION_DELAY) correct = false;
+      if (t > forkDecisionEnd(f)) correct = false;
     }
     return this.commit(
       e,

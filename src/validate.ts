@@ -136,6 +136,7 @@ function inspectChart(value: unknown) {
         b = f.keysB[i];
       if (![a.x, a.y, a.t, b.x, b.y, b.t].every(Number.isFinite) || Math.abs(a.t - b.t) > 1e-6)
         throw Error('岔路时间不一致');
+      if (distance(a, position(c.tracks[0].keys, a.t)) > 0.002) throw Error('岔路主路线不一致');
       if (i) {
         for (const route of [f.keysA, f.keysB])
           if (

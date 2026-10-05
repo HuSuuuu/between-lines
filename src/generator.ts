@@ -10,6 +10,7 @@ import type {
 } from './types';
 import {
   distance,
+  FORK_INPUT_GRACE,
   position,
   reflect,
   seeded,
@@ -123,23 +124,29 @@ export function generate(req: GenerationRequest): Chart {
     }
     const a = keys[i],
       b = keys[end],
-      keysA = keys.slice(i, end + 1).map((k) => ({ ...k })),
-      keysB = keysA.map((k) => ({ ...reflect(k, a, b), t: k.t }));
-    if (distance(keysA[1], keysB[1]) < 0.3) {
+      approach = { ...position(keys, a.t + FORK_INPUT_GRACE), t: a.t + FORK_INPUT_GRACE },
+      tail = keys.slice(i + 1, end + 1).map((k) => ({ ...k })),
+      keysA = [{ ...a }, approach, ...tail],
+      keysB = [
+        { ...a },
+        { ...approach },
+        ...tail.map((k) => ({ ...reflect(k, approach, b), t: k.t })),
+      ];
+    if (distance(keysA[2], keysB[2]) < 0.3) {
       event.kind = 'tap';
       warnings.push('该位置无法形成清楚的岔路，保留单击。');
       continue;
     }
     const dir = (p: Vec): Note['direction'] =>
-      Math.abs(p.x - a.x) > Math.abs(p.y - a.y)
-        ? p.x > a.x
+      Math.abs(p.x - approach.x) > Math.abs(p.y - approach.y)
+        ? p.x > approach.x
           ? 'right'
           : 'left'
-        : p.y > a.y
+        : p.y > approach.y
           ? 'down'
           : 'up';
-    const directionA = dir(keysA[1]),
-      directionB = dir(keysB[1]);
+    const directionA = dir(keysA[2]),
+      directionB = dir(keysB[2]);
     if (directionA === directionB) {
       event.kind = 'tap';
       warnings.push('该岔路方向不明确，保留单击。');

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { generate } from '../src/generator';
-import { Engine, MOTION_DELAY } from '../src/engine';
+import { Engine } from '../src/engine';
 import { validateChart, checkClearance } from '../src/validate';
-import { position, distance } from '../src/geometry';
+import { position, distance, forkDecisionEnd } from '../src/geometry';
 import { parseLyrics, lyricsAsLrc } from '../src/lyrics';
 import type { Chart, GenerationRequest, Entry } from '../src/types';
 const catalog = JSON.parse(fs.readFileSync('public/catalog.json', 'utf8')) as { entries: Entry[] };
@@ -165,19 +165,22 @@ describe('explicit judgment, both full songs and every branch', () => {
     expect(b.score).toBe(1000);
     expect(a.routes).not.toEqual(b.routes);
   });
-  it('allows the same slightly late branch input on either route before visual arrival', () => {
-    const c = catalog.entries.flatMap((e) => e.charts).find((c) => c.forks.length)!,
-      f = c.forks[0];
+  it('accepts slightly late branch inputs without delaying or teleporting the ball', () => {
+    const c = catalog.entries
+        .flatMap((e) => e.charts)
+        .find((c) => c.forks.some((f) => forkDecisionEnd(f) > f.start))!,
+      f = c.forks.find((f) => forkDecisionEnd(f) > f.start)!;
     const chosenAt = f.start + 0.04,
-      paintedAt = chosenAt - MOTION_DELAY;
+      paintedAt = chosenAt;
     const a = new Engine(c),
       b = new Engine(c),
       before = b.ball(0, paintedAt);
     expect(a.hit(chosenAt, 'swipe', undefined, f.directionA)?.grade).toBe('PERFECT');
     expect(b.hit(chosenAt, 'swipe', undefined, f.directionB)?.grade).toBe('PERFECT');
     expect(a.score()).toBe(b.score());
-    expect(b.ball(0, paintedAt)).toEqual(before);
-    const tooLate = f.start + MOTION_DELAY + 0.001;
+    expect(distance(b.ball(0, paintedAt), before)).toBeLessThan(1e-8);
+    expect(distance(before, position(c.tracks[0].keys, paintedAt))).toBeLessThan(1e-8);
+    const tooLate = forkDecisionEnd(f) + 0.001;
     for (const direction of [f.directionA, f.directionB]) {
       const e = new Engine(c);
       e.tick(tooLate);

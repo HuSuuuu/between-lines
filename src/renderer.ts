@@ -1,5 +1,5 @@
 import type { Chart, Vec, Settings, TextGroup } from './types';
-import { MOTION_DELAY, Engine, type Judgment } from './engine';
+import { Engine, type Judgment } from './engine';
 import { position, lerp, clamp, distance } from './geometry';
 type Flash = { at: number; points: Vec[]; grade: string; offset: number; double: boolean };
 export class Renderer {
@@ -60,9 +60,9 @@ export class Renderer {
     if (!this.width || !this.height) return;
     const dt = Math.min(0.06, (stamp - this.lastStamp) / 1000);
     this.lastStamp = stamp;
-    const a = this.engine.ball(0, t - MOTION_DELAY),
-      active = this.engine.active(t - MOTION_DELAY),
-      b = this.engine.ball(1, t - MOTION_DELAY),
+    const a = this.engine.ball(0, t),
+      active = this.engine.active(t),
+      b = this.engine.ball(1, t),
       center = active ? lerp(a, b, 0.5) : a;
     const next = this.engine.upcoming(3, t),
       lead = next[0] ? this.engine.ball(next[0].track, next[0].t) : center;
