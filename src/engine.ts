@@ -57,11 +57,12 @@ export class Engine {
       .filter((e) => !this.judged.has(e.id) && e.t >= t - this.goodWindow)
       .slice(0, count);
   }
-  candidate(t: number): Note | undefined {
+  candidate(t: number, expectedId?: string): Note | undefined {
     return this.events
       .filter(
         (e) =>
           !this.judged.has(e.id) &&
+          (!expectedId || expectedId === e.id) &&
           Math.abs(e.t - t) <= this.goodWindow + (e.kind === 'swipe' ? 0.04 : 0) &&
           (e.kind !== 'swipe' ||
             t <= forkDecisionEnd(this.chart.forks.find((f) => f.eventId === e.id)!)),
@@ -88,7 +89,7 @@ export class Engine {
     direction?: Note['direction'],
     expectedId?: string,
   ): Judgment | undefined {
-    const e = this.candidate(t);
+    const e = this.candidate(t, expectedId);
     if (!e || (expectedId && expectedId !== e.id)) {
       return undefined;
     }

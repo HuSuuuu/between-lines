@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { generate } from '../src/generator';
@@ -117,6 +118,13 @@ if (
   validateChart(updated);
   if (checkClearance(updated)) throw Error('Generated text overlaps route');
   const entry = builtinEntry(updated);
+  const optimized = path.join(assets, 'anti-utopia-play.m4a');
+  if (fs.existsSync(optimized)) {
+    entry.audioId =
+      'builtin:anti-utopia-aac:' +
+      createHash('sha256').update(fs.readFileSync(optimized)).digest('hex').slice(0, 16);
+    entry.audioName = '反乌托邦.m4a';
+  }
   entry.charts.push(legacy);
   entries.unshift(entry);
 }

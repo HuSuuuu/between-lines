@@ -40,6 +40,20 @@ function harness() {
   return { input, engine, signals, setTime: (t: number) => (time = t) };
 }
 describe('multi-contact lifecycle', () => {
+  it('finishes an armed double even when the second contact is nearer the next tap', () => {
+    const { input, engine, signals } = harness();
+    engine.events.splice(1, 0, { id: 'nearby', t: 2.07, kind: 'tap', track: 0 });
+    input.press(1, 2);
+    input.press(2, 2.05);
+    expect(signals).toHaveLength(1);
+    expect(signals[0].id).toBe('double');
+    expect(engine.judged.has('nearby')).toBe(false);
+    input.up(1);
+    input.up(2);
+    input.press(3, 2.07);
+    expect(engine.judged.has('nearby')).toBe(true);
+    input.destroy();
+  });
   it('judges two independent contacts once and ignores held or duplicate pointers', () => {
     const { input, engine, signals } = harness();
     input.press(1, 2);
@@ -149,6 +163,17 @@ class Audio {
   }
 }
 describe('shared music time, pause and independent gains', () => {
+  it('decodes shared prefetch only once without waiting for audible playback permission', async () => {
+    vi.stubGlobal('window', { AudioContext: Audio });
+    const clock = new MusicClock(defaults),
+      audio = clock.context as unknown as Audio;
+    audio.resume = vi.fn(() => new Promise<void>(() => {}));
+    const blob = new Blob(['audio']);
+    await Promise.all([clock.decode(blob), clock.decode(blob)]);
+    await clock.decode(blob);
+    expect(audio.decodeAudioData).toHaveBeenCalledOnce();
+    expect(audio.resume).not.toHaveBeenCalled();
+  });
   it('freezes position on pause, resumes the same source offset and retains full ending', async () => {
     vi.stubGlobal('window', { AudioContext: Audio });
     vi.stubGlobal('navigator', {});

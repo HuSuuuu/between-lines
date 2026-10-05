@@ -5,6 +5,8 @@ import { defaults } from './types';
 import { LibraryStore, profileKey } from './store';
 import { Engine, type Judgment } from './engine';
 import { MusicClock } from './audio';
+import { AudioLibrary, type LoadProgress } from './audio-library';
+import { noteLabel, noteMark } from './reading';
 import { PlayInput } from './input';
 import { Renderer, drawPoster } from './renderer';
 import { Editor } from './editor';
@@ -16,6 +18,20 @@ import { chartRevision, clamp } from './geometry';
 import { $, esc, clock, uid, toast, busy, fontReady } from './ui';
 const report = new RuntimeReport();
 const store = new LibraryStore();
+const audioLibrary = new AudioLibrary((id) => store.get<Blob>('audio', id));
+let offlineTimer: ReturnType<typeof setTimeout> | undefined;
+let cueSignature = '';
+function pauseFontWarm() {
+  clearTimeout(offlineTimer);
+  navigator.serviceWorker?.controller?.postMessage({ type: 'pause-fonts' });
+}
+function scheduleFontWarm() {
+  pauseFontWarm();
+  if (current === 'game' || current === 'editor' || document.hidden) return;
+  offlineTimer = setTimeout(() => {
+    navigator.serviceWorker?.controller?.postMessage({ type: 'warm-fonts' });
+  }, 10000);
+}
 let profile: Profile = {
   settings: { ...defaults },
   bests: {},
@@ -120,6 +136,8 @@ function show(page: string) {
   if (current === 'game' && page !== 'game' && gameState === 'running') pauseGame();
   if (current === 'editor' && page !== 'editor') editor.stop();
   current = page;
+  if (page === 'game' || page === 'editor' || page === 'work') pauseFontWarm();
+  else scheduleFontWarm();
   document.body.dataset.screen = page;
   for (const id of ['cover', 'library', 'work', 'editor', 'game', 'results', 'settings', 'help'])
     $(id).hidden = id !== page;
@@ -308,7 +326,10 @@ async function renderWork() {
   if (!audio) {
     ($('play') as HTMLButtonElement).disabled = true;
     ($('demo') as HTMLButtonElement).disabled = true;
-  } else ($('demo') as HTMLButtonElement).disabled = false;
+  } else {
+    ($('demo') as HTMLButtonElement).disabled = false;
+    prepareEntryAudio(entry);
+  }
   await fontReady(chart.lyrics.map((l) => l.text).join('') + entry.title);
   if (current === 'work' && currentEntry()?.id === entry.id)
     drawPoster($<HTMLCanvasElement>('poster'), chart);
@@ -341,19 +362,37 @@ $('bookSpread').addEventListener('pointerup', (e) => {
 });
 $('bookSpread').addEventListener('pointercancel', () => (bookTouch = undefined));
 async function resolveAudio(id: string): Promise<Blob | undefined> {
-  const own = await store.get<Blob>('audio', id);
-  if (own) return own;
-  if (id.startsWith('builtin:')) {
-    const file = id === 'builtin:practice' ? 'practice.wav' : 'anti-utopia.mp3';
-    try {
-      const response = await fetch(new URL('assets/' + file, location.href));
-      if (!response.ok) return undefined;
-      return response.blob();
-    } catch {
-      return undefined;
-    }
-  }
-  return undefined;
+  return audioLibrary.load(id);
+}
+function audioProgress(p: LoadProgress) {
+  return p.cached || (p.total && p.loaded >= p.total)
+    ? '音乐已下载'
+    : p.total
+      ? '下载音乐 ' + Math.round((p.loaded / p.total) * 100) + '%'
+      : '下载音乐 ' + (p.loaded / 1024 / 1024).toFixed(1) + ' MB';
+}
+function prepareEntryAudio(entry: Entry) {
+  pauseFontWarm();
+  const status = $('musicReadyStatus');
+  status.textContent = '预载音乐';
+  void audioLibrary
+    .load(entry.audioId, (progress) => {
+      if (current === 'work' && currentEntry()?.id === entry.id)
+        status.textContent = audioProgress(progress);
+    })
+    .then(async (blob) => {
+      if (!blob || current !== 'work' || currentEntry()?.id !== entry.id) return;
+      status.textContent = '准备音频';
+      music ??= new MusicClock(profile.settings);
+      await music.decode(blob);
+      if (current === 'work' && currentEntry()?.id === entry.id) status.textContent = '就绪';
+    })
+    .catch(() => {
+      if (current === 'work' && currentEntry()?.id === entry.id) status.textContent = '可点击重试';
+    })
+    .finally(() => {
+      if (current === 'work' && currentEntry()?.id === entry.id) scheduleFontWarm();
+    });
 }
 async function openEditor(draft?: Draft) {
   if (!draft) {
@@ -511,10 +550,13 @@ async function playChart(entry: Entry, chart: Chart, auto = false, fromEditor = 
   busy('准备音乐与字形');
   try {
     music ??= new MusicClock(profile.settings);
-    void music.context.resume();
+    void music.context.resume().catch(() => {});
     music.apply(profile.settings);
-    const blob = await resolveAudio(entry.audioId);
+    const blob = await audioLibrary.load(entry.audioId, (p) => {
+      if (token === sessionToken) busy(audioProgress(p));
+    });
     if (!blob) throw Error('音乐尚未附加');
+    busy('准备音频与字形');
     await Promise.all([
       music.decode(blob),
       fontReady(chart.lyrics.map((l) => l.text).join('') + chart.title),
@@ -546,6 +588,9 @@ async function playChart(entry: Entry, chart: Chart, auto = false, fromEditor = 
         if (renderer) renderer.contactAt = performance.now();
       },
       rotated,
+      (note) => {
+        if (renderer) renderer.pendingDouble = note?.id;
+      },
     );
     $('gameTitle').textContent = entry.title;
     $('combo').textContent = '0';
@@ -553,6 +598,15 @@ async function playChart(entry: Entry, chart: Chart, auto = false, fromEditor = 
     $('judgment').textContent = '';
     $('offset').textContent = '';
     lastHud = -99;
+    cueSignature = '';
+    $('gameRule').textContent = '单击任意处 · 双押用两指';
+    if (music.context.state !== 'running') {
+      busy('音乐已就绪');
+      $('unlockAudio').hidden = false;
+      $('unlockAudio').onclick = () => {
+        void music?.context.resume().catch(() => toast('请返回此页面后再试一次'));
+      };
+    }
     const started = await music.play(runRange.start, runRange.end, 0.8);
     if (!started) return;
     if (token !== sessionToken) {
@@ -610,17 +664,35 @@ function frame(stamp: number) {
         0,
         1,
       );
-      $('nextNotes').innerHTML = engine
-        .upcoming(3, t)
-        .map(
-          (e) =>
-            '<li><b>' +
-            (e.kind === 'double' ? '● ●' : e.kind === 'swipe' ? '↔' : '●') +
-            '</b><small>' +
-            Math.max(0, e.t - t).toFixed(1) +
-            's</small></li>',
-        )
-        .join('');
+      const upcoming = engine.upcoming(3, t),
+        signature = upcoming.map((e) => e.id).join(':');
+      if (signature !== cueSignature) {
+        cueSignature = signature;
+        $('nextNotes').innerHTML = upcoming
+          .map(
+            (e) =>
+              '<li data-kind="' +
+              e.kind +
+              '" aria-label="' +
+              noteLabel(e) +
+              '"><b class="track-' +
+              e.track +
+              '">' +
+              noteMark(e) +
+              '</b><span>' +
+              noteLabel(e) +
+              '</span><i></i></li>',
+          )
+          .join('');
+      }
+      const cells = $('nextNotes').children;
+      upcoming.forEach((e, i) => {
+        (cells[i] as HTMLElement)?.style.setProperty(
+          '--due',
+          String(clamp(1 - (e.t - t) / 1.2, 0, 1)),
+        );
+      });
+      $('gameRule').hidden = raw - runRange.start > 10;
       if (stamp - toastPrecisionAt > 700) {
         $('judgment').textContent = '';
         $('offset').textContent = '';
@@ -968,7 +1040,10 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('resize', layout);
 window.addEventListener('blur', pauseGame);
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) pauseGame();
+  if (document.hidden) {
+    pauseGame();
+    pauseFontWarm();
+  } else if (current !== 'game' && current !== 'editor') scheduleFontWarm();
 });
 new ResizeObserver(() => renderer?.resize()).observe($('field'));
 async function init() {
@@ -1008,7 +1083,8 @@ async function init() {
         .register('sw.js', { scope: './' })
         .then(() => navigator.serviceWorker.ready)
         .then(() => {
-          offlineStatus = '程序与宋体字库已准备，可离线创作';
+          offlineStatus = '程序已缓存，字体按需加载；停留时补全离线字库';
+          scheduleFontWarm();
           $('performanceInfo').textContent = report.summary();
           $('offlineInfo').textContent = offlineStatus;
         })
@@ -1021,4 +1097,10 @@ async function init() {
     $('coverCount').textContent = '内置曲集未载入，可创作自己的作品';
   }
 }
+navigator.serviceWorker?.addEventListener('message', (e) => {
+  if (e.data?.type === 'fonts-ready') {
+    offlineStatus = '程序与宋体字库已准备，可离线创作';
+    $('offlineInfo').textContent = offlineStatus;
+  }
+});
 void init();

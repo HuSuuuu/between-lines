@@ -5,6 +5,7 @@ coverage/
 .env*
 public/source.zip
 public/assets/anti-utopia.mp3
+public/assets/anti-utopia-play.m4a
 public/assets/legacy-chart.json
 public/assets/legacy-lyrics.json
 public/catalog.json

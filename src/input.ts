@@ -16,6 +16,7 @@ export class PlayInput {
     readonly judgment: (j: Judgment) => void,
     readonly contact: () => void,
     readonly rotated: () => boolean,
+    readonly chordChanged?: (note?: Note) => void,
   ) {
     const opts = { signal: this.abort.signal };
     field.addEventListener('pointerdown', (e) => this.down(e), opts);
@@ -49,6 +50,22 @@ export class PlayInput {
   press(pointer: number, t: number, x = 0, y = 0) {
     if (!this.enabled() || this.contacts.has(pointer)) return;
     this.contact();
+    const heldChord = this.chord;
+    if (
+      heldChord &&
+      heldChord.pointer !== pointer &&
+      Math.abs(t - heldChord.t) <= 0.08 &&
+      (this.contacts.has(heldChord.pointer) || (pointer < 0 && heldChord.pointer < 0))
+    ) {
+      const result = this.engine.hit(t, 'double', heldChord.t, undefined, heldChord.id);
+      if (result) {
+        this.contacts.set(pointer, { x, y, t, swiped: false });
+        this.chord = undefined;
+        this.chordChanged?.();
+        this.judgment(result);
+        return;
+      }
+    }
     const note = this.engine.candidate(t);
     this.contacts.set(pointer, { x, y, t, note, swiped: false });
     if (!note) {
@@ -71,8 +88,12 @@ export class PlayInput {
       ) {
         const j = this.engine.hit(t, 'double', this.chord.t, undefined, note.id);
         this.chord = undefined;
+        this.chordChanged?.();
         if (j) this.judgment(j);
-      } else this.chord = { id: note.id, t, pointer };
+      } else {
+        this.chord = { id: note.id, t, pointer };
+        this.chordChanged?.(note);
+      }
       return;
     }
     const j = this.engine.hit(t, 'tap');
@@ -102,7 +123,10 @@ export class PlayInput {
   }
   up(pointer: number) {
     this.contacts.delete(pointer);
-    if (pointer >= 0 && this.chord?.pointer === pointer) this.chord = undefined;
+    if (pointer >= 0 && this.chord?.pointer === pointer) {
+      this.chord = undefined;
+      this.chordChanged?.();
+    }
   }
   key(e: KeyboardEvent) {
     if (!this.enabled() || e.repeat || this.held.has(e.code)) return;
@@ -137,6 +161,7 @@ export class PlayInput {
   clear() {
     this.contacts.clear();
     this.chord = undefined;
+    this.chordChanged?.();
     this.held.clear();
   }
   destroy() {

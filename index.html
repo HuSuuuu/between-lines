@@ -104,7 +104,8 @@
               </select>
             </div>
             <div>
-              <button class="primary" id="play">演奏 <span>→</span></button>
+              <span id="musicReadyStatus" class="music-ready" aria-live="polite"></span
+              ><button class="primary" id="play">演奏 <span>→</span></button>
               <div class="work-tools">
                 <button id="demo">演示</button><button id="editWork">编辑副本</button
                 ><button id="exportWork">导出</button><button id="exportChart">只导谱面</button
@@ -325,6 +326,7 @@
             <strong id="judgment"></strong><span id="offset"></span>
             <div class="timing-line"><i id="timingNeedle"></i></div>
           </div>
+          <p id="gameRule" class="game-rule">单击任意处 · 双押用两指</p>
           <ol id="nextNotes" class="next-notes" aria-label="接下来三个操作"></ol>
           <span id="gameClock" class="clock"></span
           ><progress id="gameProgress" value="0" max="1"></progress>
@@ -453,6 +455,7 @@
       <div id="loading" class="loading" hidden>
         <span>●</span>
         <p id="loadingText">正在准备</p>
+        <button id="unlockAudio" class="primary" hidden>开始演奏 <span>→</span></button>
       </div>
       <input id="audioFile" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg" hidden /><input
         id="lyricsFile"

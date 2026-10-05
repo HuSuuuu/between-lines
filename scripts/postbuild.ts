@@ -1,3 +1,4 @@
+import { serviceWorker } from './service-worker';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -18,45 +19,18 @@ function walk(folder: string): string[] {
   });
 }
 const files = walk(root).filter(
-  (file) => !/\.(mp3|zip)$/.test(file) && !file.includes('legacy-') && !file.endsWith('sw.js'),
+  (file) => !/\.(mp3|m4a|zip)$/.test(file) && !file.includes('legacy-') && !file.endsWith('sw.js'),
 );
 const hash = createHash('sha256');
 for (const file of files.sort()) hash.update(file).update(fs.readFileSync(file));
 const cache = 'between-lines-v2-' + hash.digest('hex').slice(0, 12);
-const urls = files.map((file) => './' + path.relative(root, file).replaceAll(path.sep, '/'));
+const fonts = files
+  .filter((file) => file.endsWith('.woff2'))
+  .map((file) => './' + path.relative(root, file).replaceAll(path.sep, '/'));
+const urls = files
+  .filter((file) => !/\.woff2?$/.test(file))
+  .map((file) => './' + path.relative(root, file).replaceAll(path.sep, '/'));
 urls.push('./');
-const sw = `const CACHE=${JSON.stringify(cache)};
-const CORE=${JSON.stringify(urls)};
-self.addEventListener('install',event=>event.waitUntil((async()=>{
- const cache=await caches.open(CACHE);
- for(let i=0;i<CORE.length;i+=8)await cache.addAll(CORE.slice(i,i+8));
- await self.skipWaiting();
-})()));
-self.addEventListener('activate',event=>event.waitUntil((async()=>{
- const keys=await caches.keys();
- await Promise.all(keys.filter(k=>k.startsWith('between-lines-v2-')&&k!==CACHE).map(k=>caches.delete(k)));
- await self.clients.claim();
-})()));
-self.addEventListener('fetch',event=>{
- const req=event.request,url=new URL(req.url);
- if(req.method!=='GET'||url.origin!==self.location.origin||!url.href.startsWith(self.registration.scope)||req.headers.has('range'))return;
- if(url.pathname.endsWith('.zip')||url.pathname.includes('legacy-'))return;
- event.respondWith((async()=>{
-  const cache=await caches.open(CACHE),cached=await cache.match(req);
-  const immutable=/\\.(woff2?|mp3|wav)$/.test(url.pathname);
-  if(immutable&&cached)return cached;
-  try{
-   const response=await fetch(req);
-   if(response.ok){try{await cache.put(req,response.clone());}catch{}}
-   if(!response.ok&&cached)return cached;
-   return response;
-  }catch{
-   if(cached)return cached;
-   if(req.mode==='navigate'){const home=await cache.match('./');if(home)return home;}
-   return Response.error();
-  }
- })());
-});
-`;
+const sw = serviceWorker(cache, urls, fonts);
 fs.writeFileSync(path.join(root, 'sw.js'), sw);
-console.log('Offline cache:', urls.length, 'resources; complete font coverage and source archive.');
+console.log('Offline shell:', urls.length, 'resources; deferred font subsets:', fonts.length);

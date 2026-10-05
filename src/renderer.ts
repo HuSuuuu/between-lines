@@ -1,6 +1,7 @@
 import type { Chart, Vec, Settings, TextGroup } from './types';
 import { Engine, type Judgment } from './engine';
 import { position, lerp, clamp, distance } from './geometry';
+import { readingScale, glyphRasterSize } from './reading';
 type Flash = { at: number; points: Vec[]; grade: string; offset: number; double: boolean };
 export class Renderer {
   ctx: CanvasRenderingContext2D;
@@ -14,6 +15,9 @@ export class Renderer {
   cache = new Map<string, HTMLCanvasElement>();
   cacheBytes = 0;
   lastStamp = performance.now();
+  pendingDouble?: string;
+  readonly reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  rasterCreated = 0;
   cloudIndex = new Map<string, TextGroup[]>();
   cloudEntered = new Map<string, number>();
   cloudOverflow: TextGroup[] = [];
@@ -46,9 +50,14 @@ export class Renderer {
   resize() {
     const rect = this.canvas.getBoundingClientRect();
     const rotated = document.body.dataset.rotated === 'true';
-    this.width = rotated ? rect.height : rect.width;
-    this.height = rotated ? rect.width : rect.height;
-    this.dpr = Math.min(devicePixelRatio || 1, 3);
+    const width = rotated ? rect.height : rect.width,
+      height = rotated ? rect.width : rect.height;
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    if (!width || !height || (width === this.width && height === this.height && dpr === this.dpr))
+      return;
+    this.width = width;
+    this.height = height;
+    this.dpr = dpr;
     this.canvas.width = Math.round(this.width * this.dpr);
     this.canvas.height = Math.round(this.height * this.dpr);
     this.unit = Math.min(this.width, this.height) / 12;
@@ -89,7 +98,7 @@ export class Renderer {
     const aim = lerp(center, lead, 0.16);
     this.camera = lerp(this.camera, aim, 1 - Math.exp(-dt * 11));
     const spread = active ? distance(a, b) : 0;
-    const targetUnit = Math.min(this.width, this.height) / Math.max(8, spread + 3);
+    const targetUnit = readingScale(Math.min(this.width, this.height), spread);
     this.unit += (targetUnit - this.unit) * (1 - Math.exp(-dt * 6));
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.fillStyle = '#fff';
@@ -109,7 +118,7 @@ export class Renderer {
       )
         for (const group of this.cloudIndex.get(x + ':' + y) || []) visible.add(group);
     this.text([...visible], stamp);
-    if (this.settings.effects && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (this.settings.effects && !this.reduced.matches) {
       for (const track of active ? ([0, 1] as const) : ([0] as const)) {
         c.beginPath();
         for (let i = 5; i >= 0; i--) {
@@ -141,10 +150,15 @@ export class Renderer {
         const q = this.world(p);
         i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y);
       });
-      c.strokeStyle = track.id === 0 ? '#72787c' : '#92999e';
-      c.lineWidth = 0.8;
       c.lineJoin = 'round';
+      c.strokeStyle = '#ffffff';
+      c.lineWidth = 4;
       c.stroke();
+      c.strokeStyle = track.id === 0 ? '#343b40' : '#626e78';
+      c.lineWidth = track.id === 0 ? 1.1 : 1;
+      c.setLineDash(track.id === 1 ? [3, 3] : []);
+      c.stroke();
+      c.setLineDash([]);
     }
     for (const fork of this.engine.chart.forks) {
       if (fork.start < t - 0.18 || fork.start > until || this.engine.choices.has(fork.eventId))
@@ -156,48 +170,64 @@ export class Renderer {
       });
       c.strokeStyle = '#bbb';
       c.lineWidth = 0.75;
-      c.setLineDash([2.5, 3]);
+      c.setLineDash([1, 4]);
       c.stroke();
       c.setLineDash([]);
     }
     next.forEach((event, i) => {
-      const p = this.world(this.engine.ball(event.track, event.t)),
-        remaining = event.t - t,
-        alpha = i === 0 ? 1 : 0.68;
-      c.globalAlpha = alpha;
-      c.strokeStyle = '#333';
-      c.lineWidth = 0.75;
-      if (event.kind === 'double' && !this.engine.active(event.t)) {
-        this.pearl(p.x - 3.5, p.y, 2.1);
-        this.pearl(p.x + 3.5, p.y, 2.1);
-      } else {
-        this.pearl(p.x, p.y, event.kind === 'swipe' ? 3.4 : 2.4);
-        if (event.kind === 'double') {
-          const q = this.world(this.engine.ball((1 - event.track) as 0 | 1, event.t));
-          this.pearl(q.x, q.y, 2.4);
-        }
-      }
-      if (i === 0 && remaining > 0 && remaining < 1.25) {
+      const p = this.world(this.engine.ball(event.track, event.t));
+      const points = [p];
+      if (event.kind === 'double' && this.engine.active(event.t))
+        points.push(this.world(this.engine.ball((1 - event.track) as 0 | 1, event.t)));
+      const remaining = event.t - t,
+        primary = i === 0;
+      c.globalAlpha = primary ? 1 : i === 1 ? 0.8 : 0.6;
+      if (points.length === 2) {
         c.beginPath();
-        c.arc(p.x, p.y, 3.5 + Math.min(16, remaining * 12), -0.5 * Math.PI, 1.5 * Math.PI);
-        c.strokeStyle = 'rgba(70,70,70,' + (0.12 + 0.2 * (1 - remaining / 1.25)) + ')';
+        c.moveTo(p.x, p.y);
+        c.lineTo(points[1].x, points[1].y);
+        c.strokeStyle = '#b9c0c5';
+        c.lineWidth = 0.65;
+        c.setLineDash([2, 5]);
         c.stroke();
+        c.setLineDash([]);
       }
-      c.globalAlpha = 1;
-      if (event.kind === 'swipe' && i === 0) {
-        const f = this.engine.chart.forks.find((f) => f.eventId === event.id);
-        if (f) {
-          const arrows = { left: '←', right: '→', up: '↑', down: '↓' };
-          c.font = '12px Arial';
-          c.textAlign = 'center';
-          c.fillStyle = '#777';
-          c.fillText(arrows[f.directionA!] + arrows[f.directionB!], p.x, p.y - 13);
+      points.forEach((point) => {
+        c.strokeStyle = primary ? '#333' : '#777';
+        c.lineWidth = primary ? 1.1 : 0.8;
+        this.pearl(
+          point.x,
+          point.y,
+          event.kind === 'double' ? 3.6 : event.kind === 'swipe' ? 4 : 2.8,
+        );
+        if (primary && remaining > 0 && remaining < 1.2) {
+          const phase = clamp(remaining / 1.2, 0, 1);
+          c.beginPath();
+          c.arc(point.x, point.y, 4.5 + phase * 17, -Math.PI / 2, Math.PI * 1.5);
+          c.strokeStyle = '#a2abb2';
+          c.lineWidth = 0.7;
+          c.stroke();
         }
-      }
+      });
+      const badge = points.length === 2 ? lerp(p, points[1], 0.5) : { x: p.x, y: p.y - 18 };
+      c.fillStyle = '#fff';
+      c.fillRect(badge.x - 15, badge.y - 8, 30, 16);
+      c.fillStyle = primary ? '#25282a' : '#7a8085';
+      c.font = '600 11px Arial';
+      c.textAlign = 'center';
+      if (event.kind === 'double') {
+        c.fillText(this.pendingDouble === event.id ? '●·' : '●○', badge.x, badge.y + 3);
+      } else if (event.kind === 'swipe') {
+        const f = this.engine.chart.forks.find((f) => f.eventId === event.id);
+        const arrows = { left: '←', right: '→', up: '↑', down: '↓' };
+        c.fillText(f ? arrows[f.directionA!] + arrows[f.directionB!] : '↔', badge.x, badge.y + 3);
+      } else c.fillText(String(i + 1), badge.x, badge.y + 3);
+      c.globalAlpha = 1;
     });
-    const focus = next[0]?.track || 0;
-    this.ball(a, focus === 0, stamp);
-    if (active) this.ball(b, focus === 1, stamp);
+    const focus = next[0]?.track || 0,
+      paired = next[0]?.kind === 'double';
+    this.ball(a, paired || focus === 0, stamp, 0);
+    if (active) this.ball(b, paired || focus === 1, stamp, 1);
     const announced = this.engine.chart.duets.find(
       (d) =>
         (d.start > t && d.start - t <= 120 / this.engine.chart.tempo) ||
@@ -213,8 +243,18 @@ export class Renderer {
     this.flashes = this.flashes.filter((f) => stamp - f.at < 330);
     for (const f of this.flashes) {
       const age = (stamp - f.at) / 330;
-      if (!this.settings.effects || matchMedia('(prefers-reduced-motion: reduce)').matches)
-        continue;
+      if (!this.settings.effects || this.reduced.matches) continue;
+      if (f.double && f.points.length === 2) {
+        const a = this.world(f.points[0]),
+          b = this.world(f.points[1]);
+        c.globalAlpha = Math.pow(1 - age, 2) * 0.8;
+        c.strokeStyle = f.grade === 'MISS' ? '#555' : '#8f9ba4';
+        c.lineWidth = 1.1;
+        c.beginPath();
+        c.moveTo(a.x, a.y);
+        c.lineTo(b.x, b.y);
+        c.stroke();
+      }
       for (const point of f.points) {
         const p = this.world(point);
         c.globalAlpha = Math.pow(1 - age, 2.4) * 0.95;
@@ -231,15 +271,36 @@ export class Renderer {
         c.beginPath();
         c.arc(p.x, p.y, 5 + (1 - Math.pow(1 - age, 4)) * 19, 0, Math.PI * 2);
         c.stroke();
-        if (age < 0.7) {
+        if (age < 0.4 && f.grade !== 'MISS') {
+          c.strokeStyle = '#9da7ae';
+          c.lineWidth = 1;
+          for (let i = 0; i < 4; i++) {
+            const angle = Math.PI / 4 + (i * Math.PI) / 2,
+              r = 7 + age * 25;
+            c.beginPath();
+            c.moveTo(p.x + Math.cos(angle) * r, p.y + Math.sin(angle) * r);
+            c.lineTo(p.x + Math.cos(angle) * (r + 5), p.y + Math.sin(angle) * (r + 5));
+            c.stroke();
+          }
+        }
+        if (age < 0.7 && point === f.points[0]) {
           c.fillStyle = '#333';
-          c.font = '600 8px Arial';
+          c.font = '600 9px Arial';
           c.textAlign = 'center';
           c.fillText(
             f.grade === 'MISS' ? 'MISS' : Math.abs(f.offset) <= 0.025 ? 'JUST' : f.grade,
             p.x,
-            p.y - 12,
+            p.y - 19,
           );
+          if (f.grade !== 'MISS') {
+            c.font = '8px monospace';
+            c.fillStyle = '#6a747c';
+            c.fillText(
+              (f.offset >= 0 ? '+' : '') + Math.round(f.offset * 1000) + ' ms',
+              p.x,
+              p.y - 9,
+            );
+          }
         }
       }
     }
@@ -253,7 +314,7 @@ export class Renderer {
     c.fill();
     c.stroke();
   }
-  ball(point: Vec, focus: boolean, stamp: number) {
+  ball(point: Vec, focus: boolean, stamp: number, track: 0 | 1) {
     const p = this.world(point),
       c = this.ctx;
     const g = c.createRadialGradient(p.x - 1, p.y - 1, 0, p.x, p.y, 10);
@@ -265,18 +326,30 @@ export class Renderer {
     c.beginPath();
     c.arc(p.x, p.y, 10, 0, Math.PI * 2);
     c.fill();
-    c.fillStyle = focus ? '#161616' : '#fff';
-    c.strokeStyle = focus ? '#fff' : '#333';
+    c.fillStyle = track === 0 ? '#161616' : '#fff';
+    c.strokeStyle = track === 0 ? '#fff' : '#333';
     c.lineWidth = focus ? 1 : 0.8;
     c.beginPath();
-    c.arc(p.x, p.y, 4.1, 0, Math.PI * 2);
+    let hit: Flash | undefined;
+    for (let i = this.flashes.length - 1; i >= 0; i--) {
+      const f = this.flashes[i];
+      if (
+        f.grade !== 'MISS' &&
+        stamp - f.at < 150 &&
+        f.points.some((q) => distance(q, point) < 0.4)
+      ) {
+        hit = f;
+        break;
+      }
+    }
+    const impact =
+      hit && this.settings.effects && !this.reduced.matches
+        ? Math.sin(((stamp - hit.at) / 150) * Math.PI) * 1.7
+        : 0;
+    c.arc(p.x, p.y, 4.1 + impact, 0, Math.PI * 2);
     c.fill();
     c.stroke();
-    if (
-      this.settings.effects &&
-      !matchMedia('(prefers-reduced-motion: reduce)').matches &&
-      stamp - this.contactAt < 85
-    ) {
+    if (this.settings.effects && !this.reduced.matches && stamp - this.contactAt < 85) {
       c.strokeStyle = '#a4a9ad';
       c.lineWidth = 0.65;
       c.beginPath();
@@ -286,7 +359,7 @@ export class Renderer {
   }
   text(groups: TextGroup[], stamp = performance.now()) {
     const c = this.ctx;
-    const motion = this.settings.effects && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const motion = this.settings.effects && !this.reduced.matches;
     for (const group of groups) {
       if (!this.cloudEntered.has(group.id)) this.cloudEntered.set(group.id, stamp);
       const age = Math.min(1, (stamp - this.cloudEntered.get(group.id)!) / 680);
@@ -298,7 +371,7 @@ export class Renderer {
           half = px * 0.8;
         if (p.x < -half || p.x > this.width + half || p.y < -half || p.y > this.height + half)
           continue;
-        const pixels = Math.round(px * this.dpr),
+        const pixels = glyphRasterSize(g.size, Math.min(this.width, this.height), this.dpr),
           key = g.text + ':' + pixels;
         let tile = this.cache.get(key);
         if (!tile) {
@@ -311,15 +384,19 @@ export class Renderer {
           tc.textBaseline = 'middle';
           tc.fillStyle = '#171717';
           tc.fillText(g.text, tile.width / 2, tile.height / 2);
+          this.rasterCreated++;
           this.cache.set(key, tile);
           this.cacheBytes += tile.width * tile.height * 4;
         }
+        const scale = px / pixels,
+          w = tile.width * scale,
+          h = tile.height * scale;
         c.drawImage(
           tile,
-          Math.round((p.x - tile.width / this.dpr / 2) * this.dpr) / this.dpr,
-          Math.round((p.y - tile.height / this.dpr / 2) * this.dpr) / this.dpr,
-          tile.width / this.dpr,
-          tile.height / this.dpr,
+          Math.round((p.x - w / 2) * this.dpr) / this.dpr,
+          Math.round((p.y - h / 2) * this.dpr) / this.dpr,
+          w,
+          h,
         );
       }
     }

@@ -58,7 +58,7 @@ describe('public data interface and source delivery', () => {
     expect(files).toContain('between-lines/public/assets/practice.wav');
     expect(
       files.some((p) =>
-        /anti-utopia\.mp3|legacy-chart\.json|legacy-lyrics\.json|catalog\.json|node_modules|\/\.git\/|proof\/|source\.zip/.test(
+        /anti-utopia\.mp3|anti-utopia-play\.m4a|legacy-chart\.json|legacy-lyrics\.json|catalog\.json|node_modules|\/\.git\/|proof\/|source\.zip/.test(
           p,
         ),
       ),

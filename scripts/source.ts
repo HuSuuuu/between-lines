@@ -9,6 +9,7 @@ export function sourceArchive() {
     'public/catalog.json',
     'public/example.chart.json',
     'public/assets/anti-utopia.mp3',
+    'public/assets/anti-utopia-play.m4a',
     'public/assets/legacy-chart.json',
     'public/assets/legacy-lyrics.json',
   ]);

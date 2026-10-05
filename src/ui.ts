@@ -19,6 +19,7 @@ export function toast(text: string) {
 }
 export function busy(text?: string) {
   $('loading').hidden = !text;
+  $('unlockAudio').hidden = true;
   if (text) $('loadingText').textContent = text;
 }
 export async function fontReady(text: string) {
@@ -26,7 +27,6 @@ export async function fontReady(text: string) {
     '400 18px "Noto Serif SC"',
     Array.from(new Set(Array.from(text))).join('') || '字里行间',
   );
-  await document.fonts.ready;
 }
 export function drawWave(canvas: HTMLCanvasElement, peaks: number[], current = 0) {
   const width = canvas.clientWidth,

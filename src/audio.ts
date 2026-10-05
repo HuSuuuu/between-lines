@@ -15,6 +15,8 @@ export class MusicClock {
   noise: AudioBuffer;
   decodeToken = 0;
   operation = 0;
+  private decodedBlob?: Blob;
+  private decoding?: Promise<AudioBuffer>;
   constructor(settings: Settings) {
     this.settings = { ...settings };
     const Audio = window.AudioContext || (window as any).webkitAudioContext;
@@ -47,11 +49,22 @@ export class MusicClock {
     this.hits.gain.setValueAtTime(s.hits / 100, this.context.currentTime);
   }
   async decode(blob: Blob) {
+    if (blob === this.decodedBlob && this.decoding) return this.decoding;
     const token = ++this.decodeToken;
-    await this.context.resume();
-    const buffer = await this.context.decodeAudioData(await blob.arrayBuffer());
-    if (token === this.decodeToken) this.buffer = buffer;
-    return buffer;
+    this.decodedBlob = blob;
+    const pending = blob.arrayBuffer().then((data) => this.context.decodeAudioData(data));
+    this.decoding = pending;
+    try {
+      const buffer = await pending;
+      if (token === this.decodeToken) this.buffer = buffer;
+      return buffer;
+    } catch (error) {
+      if (token === this.decodeToken) {
+        this.decodedBlob = undefined;
+        this.decoding = undefined;
+      }
+      throw error;
+    }
   }
   async play(start = 0, end = this.buffer?.duration || 0, countIn = 0.8) {
     const operation = ++this.operation;
