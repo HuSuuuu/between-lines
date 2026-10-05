@@ -1,0 +1,8 @@
+node_modules
+dist
+public/assets
+public/catalog.json
+public/example.chart.json
+public/source.zip
+proof
+verification*.json

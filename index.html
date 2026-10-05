@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="description" content="翻阅、演奏、编写自己的歌词书。开源文字空间音游。" />
+    <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <title>字里行间 · 可演奏的歌词书</title>
+  </head>
+  <body>
+    <div id="app">
+      <section id="cover" class="screen cover-screen">
+        <header class="nav">
+          <span class="brand">字里行间 <small>02</small></span>
+          <div>
+            <button data-action="layout" aria-label="切换横屏布局">横屏 ↗</button
+            ><button data-action="settings">设置</button>
+          </div>
+        </header>
+        <main class="cover-body">
+          <div class="book-cover">
+            <span class="edition">可演奏的歌词集</span>
+            <h1><span>字里</span><span>行间</span></h1>
+            <div class="cover-mark"><span>●</span><i></i><span>●</span></div>
+            <span class="edition bottom-edition">开放创作 / 本机曲库</span>
+          </div>
+          <div class="cover-index">
+            <p class="folio">序</p>
+            <h2>打开这一页。</h2>
+            <button class="primary" id="openBook">翻开曲集 <span>→</span></button
+            ><button class="text-link" data-action="create">编写我的一首</button
+            ><button class="text-link" data-action="help">怎么玩</button>
+            <p id="coverCount" class="muted">正在整理曲集</p>
+          </div>
+        </main>
+        <footer>
+          <a href="https://github.com/HuSuuuu/between-lines" target="_blank" rel="noopener"
+            >开源 / 源码</a
+          ><span>字里行间 · 2.0</span>
+        </footer>
+      </section>
+      <section id="library" class="screen" hidden>
+        <header class="nav">
+          <button data-action="cover">← 封面</button><span class="brand">目录</span>
+          <div>
+            <button id="importPackage">导入谱包</button
+            ><button data-action="create">＋ 创作</button>
+          </div>
+        </header>
+        <div class="contents-top">
+          <label class="search"
+            ><input id="search" type="search" placeholder="找一首作品" aria-label="搜索作品" /><span
+              >⌕</span
+            ></label
+          >
+          <nav class="tabs" aria-label="曲库分类">
+            <button data-filter="all" aria-pressed="true">全部</button
+            ><button data-filter="recent">最近</button><button data-filter="favorite">收藏</button
+            ><button data-filter="mine">我的创作</button>
+          </nav>
+        </div>
+        <main id="contents" class="contents"></main>
+        <footer><span id="libraryCount"></span><button id="resumeBook">上次读到 →</button></footer>
+        <div id="draftShelf"></div>
+      </section>
+      <section id="work" class="screen work-screen" hidden>
+        <header class="nav">
+          <button data-action="library">← 目录</button><span class="brand" id="workFolio"></span>
+          <div>
+            <button id="favorite" aria-label="收藏作品">♡</button
+            ><button data-action="settings">设置</button>
+          </div>
+        </header>
+        <main class="book-spread" id="bookSpread" tabindex="0" aria-label="作品书页，可左右翻页">
+          <div class="art-page">
+            <canvas id="poster" aria-label="完整歌词构图"></canvas
+            ><span id="posterCaption" class="muted"></span>
+          </div>
+          <article class="info-page">
+            <div>
+              <p class="folio" id="workNumber"></p>
+              <h1 id="workTitle"></h1>
+              <p id="workArtist" class="muted"></p>
+            </div>
+            <div class="work-middle">
+              <label class="label" for="chartPicker">谱面</label
+              ><select id="chartPicker"></select>
+              <div class="difficulty" aria-label="难度">
+                <button data-difficulty="basic" aria-pressed="false">
+                  基础 <small>单押与同步</small></button
+                ><button data-difficulty="standard" aria-pressed="true">
+                  原谱 <small id="noteCount"></small>
+                </button>
+              </div>
+              <div class="best-line">
+                <span class="muted">本机最高</span><strong id="bestScore">—</strong>
+              </div>
+              <label class="label" for="practicePicker">演奏范围</label
+              ><select id="practicePicker">
+                <option value="full">完整演奏</option>
+              </select>
+            </div>
+            <div>
+              <button class="primary" id="play">演奏 <span>→</span></button>
+              <div class="work-tools">
+                <button id="demo">演示</button><button id="editWork">编辑副本</button
+                ><button id="exportWork">导出</button><button id="exportChart">只导谱面</button
+                ><button id="attachAudio" hidden>附加音乐</button>
+              </div>
+            </div>
+          </article>
+        </main>
+        <footer class="page-nav">
+          <button id="prevPage" aria-label="上一首作品">← 上一页</button><span id="pageCount"></span
+          ><button id="nextPage" aria-label="下一首作品">下一页 →</button>
+        </footer>
+      </section>
+      <section id="editor" class="screen editor-screen" hidden>
+        <header class="nav">
+          <button id="leaveEditor">← 目录</button><span class="brand">编写</span>
+          <div>
+            <span id="saveStatus" class="muted">草稿</span
+            ><button id="undo" aria-label="撤销">↶</button
+            ><button id="redo" aria-label="重做">↷</button>
+          </div>
+        </header>
+        <nav id="steps" class="steps" aria-label="创作步骤">
+          <button data-step="0" aria-current="step">01 <span>音乐</span></button
+          ><button data-step="1">02 <span>歌词</span></button
+          ><button data-step="2">03 <span>敲谱</span></button
+          ><button data-step="3">04 <span>地图</span></button
+          ><button data-step="4">05 <span>成篇</span></button>
+        </nav>
+        <main class="editor-body">
+          <div data-panel="0" class="edit-panel">
+            <div class="step-heading">
+              <p class="folio">01 / 音乐</p>
+              <h1>从一首歌开始。</h1>
+            </div>
+            <div class="edit-fields">
+              <button class="drop-file" id="chooseAudio">
+                <span>＋</span><strong>选择音乐</strong><small>MP3 / WAV / M4A / OGG</small>
+              </button>
+              <p id="audioName" class="muted"></p>
+              <label
+                >作品名<input id="draftTitle" maxlength="120" placeholder="这首作品的名字" /></label
+              ><label
+                >音乐作者<input id="draftArtist" maxlength="120" placeholder="作者署名" /></label
+              ><canvas id="importWave" class="waveform" aria-label="导入音乐的波形"></canvas>
+            </div>
+          </div>
+          <div data-panel="1" class="edit-panel" hidden>
+            <div class="step-heading">
+              <p class="folio">02 / 歌词</p>
+              <h1>让文字成为地图。</h1>
+              <button class="text-link" id="chooseLyrics">导入 TXT / LRC</button>
+            </div>
+            <div class="edit-fields">
+              <label for="lyricsText">歌词，可保留空行分段</label
+              ><textarea
+                id="lyricsText"
+                rows="9"
+                placeholder="粘贴歌词。没有歌词也能先敲谱。"
+              ></textarea>
+              <div class="lyric-sync">
+                <button id="syncLyrics">听歌标句</button
+                ><button id="markLyric" disabled>下一句 · 标记起点</button
+                ><span id="syncCurrent" class="muted"></span>
+              </div>
+              <ol id="lyricLines" class="lyric-lines"></ol>
+            </div>
+          </div>
+          <div data-panel="2" class="record-panel" hidden>
+            <div class="record-top">
+              <div>
+                <p class="folio">03 / 敲谱</p>
+                <h1>跟着音乐，敲下来。</h1>
+              </div>
+              <span id="recordClock" class="clock">00:00</span>
+            </div>
+            <canvas id="recordWave" class="waveform" aria-label="录谱波形"></canvas
+            ><label class="label" for="recordSeek">试听位置</label
+            ><input
+              id="recordSeek"
+              type="range"
+              min="0"
+              max="100"
+              step="0.01"
+              value="0"
+              aria-label="试听位置"
+            />
+            <div class="record-transport">
+              <button id="listen">试听</button
+              ><button id="record" class="dark-button">开始敲谱</button
+              ><button id="stopRecord" disabled>停止</button
+              ><label class="check"><input id="loop" type="checkbox" />循环重录</label
+              ><label
+                >从
+                <input
+                  id="rangeStart"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value="0"
+                  aria-label="段落开始秒数" /></label
+              ><label
+                >到
+                <input
+                  id="rangeEnd"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value="10"
+                  aria-label="段落结束秒数"
+              /></label>
+            </div>
+            <div
+              id="tapPad"
+              class="tap-pad"
+              tabindex="0"
+              aria-label="录谱区，单击记录单押，双指或 F 加 J 记录双押"
+            >
+              <span id="tapCount">0</span><small id="tapHint">单击 / 双指 · 空格 / F＋J</small>
+            </div>
+            <div class="timeline-title">
+              <span class="label">节奏时间轴</span><span id="eventCount" class="muted"></span
+              ><label
+                >BPM
+                <input
+                  id="tempo"
+                  type="number"
+                  min="30"
+                  max="300"
+                  step="0.1"
+                  value="120"
+                  aria-label="吸附 BPM" /></label
+              ><button id="snap">吸附节拍</button>
+            </div>
+            <div id="timeline" class="timeline" aria-label="可拖动节奏点的时间轴"></div>
+            <div id="noteEditor" class="note-editor" hidden>
+              <label
+                >时间
+                <input
+                  id="noteTime"
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  aria-label="节奏点时间" /></label
+              ><select id="noteKind" aria-label="节奏点类型">
+                <option value="tap">单击</option>
+                <option value="double">双押</option>
+                <option value="swipe">岔路滑动</option></select
+              ><button id="deleteNote">删除此点</button>
+            </div>
+          </div>
+          <div data-panel="3" class="edit-panel" hidden>
+            <div class="step-heading">
+              <p class="folio">04 / 地图</p>
+              <h1>让路线穿过字群。</h1>
+            </div>
+            <div class="edit-fields">
+              <label
+                >构图<select id="template">
+                  <option value="inset">大词组嵌入小字群</option>
+                  <option value="horizontal">紧密横排</option>
+                  <option value="vertical">紧密竖排</option>
+                </select></label
+              ><label>重点词句<input id="emphasis" placeholder="可选，用逗号分开" /></label>
+              <div class="duet-controls">
+                <label
+                  >双球起点
+                  <input id="duetStart" type="number" min="0" step="0.1" value="4" /></label
+                ><label
+                  >双球终点
+                  <input id="duetEnd" type="number" min="0.1" step="0.1" value="12" /></label
+                ><button id="addDuet">加入双球段落</button>
+              </div>
+              <div id="duetList"></div>
+              <details>
+                <summary>高级编排</summary>
+                <label>构图种子<input id="seed" type="number" min="0" value="20261005" /></label>
+                <p class="muted">在节奏时间轴中，将单个节奏点设为「岔路滑动」。</p>
+              </details>
+              <button id="generate" class="primary">生成文字地图 <span>→</span></button>
+              <p id="generationNote" role="status" class="muted"></p>
+              <canvas
+                id="generatedPoster"
+                class="generated-poster"
+                aria-label="生成的歌词地图预览"
+              ></canvas>
+            </div>
+          </div>
+          <div data-panel="4" class="edit-panel" hidden>
+            <div class="step-heading">
+              <p class="folio">05 / 成篇</p>
+              <h1>这一篇，可以演奏了。</h1>
+            </div>
+            <div class="edit-fields">
+              <canvas id="finishPoster" class="generated-poster" aria-label="完成作品预览"></canvas>
+              <p id="finishInfo" class="muted"></p>
+              <button id="previewDraft" class="primary">试玩 <span>→</span></button
+              ><button id="saveWork" class="dark-button">保存到我的曲集</button
+              ><button id="saveCopy">另存一个版本</button
+              ><button id="exportDraft">导出谱包备份</button>
+            </div>
+          </div>
+        </main>
+        <footer>
+          <button id="prevStep">← 上一步</button><span id="editorNote" class="muted"></span
+          ><button id="nextStep">下一步 →</button>
+        </footer>
+      </section>
+      <section id="game" class="game-screen" hidden>
+        <aside class="game-hud">
+          <div class="game-heading">
+            <span id="gameTitle"></span><button id="pause" aria-label="暂停">Ⅱ</button>
+          </div>
+          <div class="score-stack">
+            <strong id="combo">0</strong><span>连击</span><small id="score">0000</small>
+          </div>
+          <div class="precision">
+            <strong id="judgment"></strong><span id="offset"></span>
+            <div class="timing-line"><i id="timingNeedle"></i></div>
+          </div>
+          <ol id="nextNotes" class="next-notes" aria-label="接下来三个操作"></ol>
+          <span id="gameClock" class="clock"></span
+          ><progress id="gameProgress" value="0" max="1"></progress>
+        </aside>
+        <div
+          id="field"
+          class="game-field"
+          tabindex="0"
+          aria-label="演奏区：点击、双指双押、滑动选择岔路"
+        >
+          <canvas id="gameCanvas" aria-label="歌词迷宫、连续运动的小球与节奏节点"></canvas>
+          <div id="pauseOverlay" class="pause-overlay" hidden>
+            <div class="pause-paper">
+              <p class="folio" id="pauseLabel">暂停</p>
+              <h1 id="pauseTitle">下一拍，继续。</h1>
+              <button id="continue" class="primary">继续 <span>→</span></button>
+              <div class="pause-actions">
+                <button id="restart">重开</button><button id="gameSettings">设置</button
+                ><button id="toggleAuto">演示</button><button id="leaveGame">返回书页</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section id="results" class="screen" hidden>
+        <header class="nav">
+          <button id="resultHome">← 书页</button><span class="brand">演奏完成</span
+          ><button data-action="library">目录</button>
+        </header>
+        <main class="result-spread">
+          <div class="result-route">
+            <svg id="resultRoute" viewBox="0 0 360 320" aria-label="本次路线"></svg
+            ><span id="resultMode" class="muted"></span>
+          </div>
+          <article class="result-info">
+            <p id="resultSong" class="folio"></p>
+            <div class="result-score">
+              <h1 id="resultScore"></h1>
+              <span id="resultGrade"></span>
+            </div>
+            <p id="resultBadge" class="muted"></p>
+            <div class="result-stats">
+              <div><strong id="resultPerfect"></strong><span>PERFECT</span></div>
+              <div><strong id="resultGood"></strong><span>GOOD</span></div>
+              <div><strong id="resultMiss"></strong><span>MISS</span></div>
+              <div><strong id="resultCombo"></strong><span>最高连击</span></div>
+            </div>
+            <p id="resultPrecision" class="muted"></p>
+            <button id="again" class="primary">再演奏一次 <span>→</span></button
+            ><button id="resultBack">回到书页</button>
+          </article>
+        </main>
+      </section>
+      <section id="settings" class="screen" hidden>
+        <header class="nav">
+          <button id="closeSettings">← 返回</button><span class="brand">设置</span>
+        </header>
+        <main class="settings-spread">
+          <div>
+            <p class="folio">按自己的节奏。</p>
+            <h1 class="page-title">听见。<br />击中。</h1>
+            <details>
+              <summary>运行诊断</summary>
+              <p id="performanceInfo" class="muted">完成一次演奏后显示。</p>
+            </details>
+            <p id="offlineInfo" class="muted"></p>
+            <p id="storageInfo" class="muted"></p>
+          </div>
+          <div class="settings-fields">
+            <label
+              >音乐音量 <output id="musicValue"></output
+              ><input id="musicVolume" type="range" min="0" max="100" step="5" /></label
+            ><label
+              >击打音量 <output id="hitsValue"></output
+              ><input id="hitVolume" type="range" min="0" max="100" step="5" /></label
+            ><label
+              >节奏校准 <output id="offsetValue"></output
+              ><input id="timingOffset" type="range" min="-150" max="150" step="5" /><small
+                >正值提前，负值延后；下一次演奏生效。</small
+              ></label
+            ><label class="switch">命中光效<input id="effectsEnabled" type="checkbox" /></label
+            ><label class="switch">触觉反馈<input id="hapticsEnabled" type="checkbox" /></label
+            ><label class="switch"
+              >画面布局<select id="layoutPicker">
+                <option value="auto">自动 · 随设备方向</option>
+                <option value="landscape">横屏 · 横向画面</option>
+              </select></label
+            >
+            <div class="work-tools">
+              <button id="resetSettings">恢复默认</button><button id="fullscreen">全屏 ↗</button>
+            </div>
+            <a class="text-link" href="./source.zip" download>下载开源工程</a>
+          </div>
+        </main>
+      </section>
+      <section id="help" class="screen" hidden>
+        <header class="nav">
+          <button id="closeHelp">← 返回</button><span class="brand">三种操作</span>
+        </header>
+        <main class="help-body">
+          <h1 class="page-title">读下一拍，<br />手指跟上。</h1>
+          <div class="help-grid">
+            <article>
+              <span>●</span>
+              <h2>单击</h2>
+              <p>节点到球时，点演奏区任意位置。</p>
+              <small>空格 / F / J</small>
+            </article>
+            <article>
+              <span>● ●</span>
+              <h2>双押</h2>
+              <p>两个节点同拍，双指一起落下。</p>
+              <small>F＋J</small>
+            </article>
+            <article>
+              <span>↔</span>
+              <h2>岔路</h2>
+              <p>按预告方向滑动，选择一条走法。</p>
+              <small>方向键 / WASD</small>
+            </article>
+          </div>
+          <p class="muted">两个球共用节奏预读；无需点中小球。</p>
+          <button id="startTutorial" class="primary">试一页练习 <span>→</span></button>
+        </main>
+      </section>
+      <div id="toast" role="status" hidden></div>
+      <div id="loading" class="loading" hidden>
+        <span>●</span>
+        <p id="loadingText">正在准备</p>
+      </div>
+      <input id="audioFile" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg" hidden /><input
+        id="lyricsFile"
+        type="file"
+        accept=".txt,.lrc,text/plain"
+        hidden
+      /><input
+        id="packageFile"
+        type="file"
+        accept=".zip,.json,application/zip,application/json"
+        hidden
+      /><input id="attachFile" type="file" accept="audio/*" hidden />
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

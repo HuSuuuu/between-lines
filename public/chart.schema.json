@@ -1,0 +1,372 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rhythm-combat-demo.pages.dev/space/chart.schema.json",
+  "title": "Between Lines Chart v11",
+  "description": "声明式数据；时间为音乐秒数，坐标为统一世界尺度。几何关系与恒速约束还须运行 npm run validate。",
+  "type": "object",
+  "required": [
+    "version",
+    "id",
+    "songId",
+    "title",
+    "artist",
+    "duration",
+    "revision",
+    "seed",
+    "tempo",
+    "speed",
+    "events",
+    "tracks",
+    "duets",
+    "forks",
+    "groups",
+    "chapters",
+    "lyrics",
+    "template",
+    "warnings"
+  ],
+  "properties": {
+    "version": {
+      "const": 11
+    },
+    "id": {
+      "type": "string"
+    },
+    "songId": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "artist": {
+      "type": "string"
+    },
+    "duration": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "revision": {
+      "type": "string"
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "tempo": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "speed": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/note"
+      },
+      "minItems": 0,
+      "maxItems": 50000
+    },
+    "tracks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/track"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "duets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/duet"
+      },
+      "minItems": 0
+    },
+    "forks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fork"
+      },
+      "minItems": 0
+    },
+    "groups": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/group"
+      },
+      "minItems": 0,
+      "maxItems": 10000
+    },
+    "chapters": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/chapter"
+      },
+      "minItems": 1
+    },
+    "lyrics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/lyric"
+      },
+      "minItems": 0
+    },
+    "template": {
+      "enum": ["horizontal", "vertical", "inset"]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "vec": {
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "key": {
+      "type": "object",
+      "required": ["x", "y", "t"],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "t": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "lyric": {
+      "type": "object",
+      "required": ["id", "text"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "t": {
+          "type": "number",
+          "minimum": 0
+        },
+        "paragraph": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "note": {
+      "type": "object",
+      "required": ["id", "t", "kind", "track"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "t": {
+          "type": "number",
+          "minimum": 0
+        },
+        "kind": {
+          "enum": ["tap", "double", "swipe"]
+        },
+        "track": {
+          "enum": [0, 1]
+        },
+        "direction": {
+          "enum": ["left", "right", "up", "down"]
+        },
+        "rawTimes": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "maxItems": 2,
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "glyph": {
+      "type": "object",
+      "required": ["x", "y", "text", "size"],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string"
+        },
+        "size": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 50
+        }
+      },
+      "additionalProperties": false
+    },
+    "track": {
+      "type": "object",
+      "required": ["id", "keys"],
+      "properties": {
+        "id": {
+          "enum": [0, 1]
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/key"
+          },
+          "minItems": 2,
+          "maxItems": 100000
+        }
+      },
+      "additionalProperties": false
+    },
+    "duet": {
+      "type": "object",
+      "required": ["id", "start", "end"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "start": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "fork": {
+      "type": "object",
+      "required": [
+        "eventId",
+        "track",
+        "start",
+        "end",
+        "directionA",
+        "directionB",
+        "keysA",
+        "keysB"
+      ],
+      "properties": {
+        "eventId": {
+          "type": "string"
+        },
+        "track": {
+          "enum": [0, 1]
+        },
+        "start": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end": {
+          "type": "number",
+          "minimum": 0
+        },
+        "directionA": {
+          "enum": ["left", "right", "up", "down"]
+        },
+        "directionB": {
+          "enum": ["left", "right", "up", "down"]
+        },
+        "keysA": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/key"
+          },
+          "minItems": 3
+        },
+        "keysB": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/key"
+          },
+          "minItems": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "group": {
+      "type": "object",
+      "required": ["id", "text", "role", "orientation", "glyphs", "section"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "role": {
+          "enum": ["body", "hero"]
+        },
+        "orientation": {
+          "enum": ["horizontal", "vertical"]
+        },
+        "glyphs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glyph"
+          },
+          "minItems": 1,
+          "maxItems": 150000
+        },
+        "section": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "chapter": {
+      "type": "object",
+      "required": ["id", "title", "start", "end", "anchor"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "start": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end": {
+          "type": "number",
+          "minimum": 0
+        },
+        "anchor": {
+          "$ref": "#/$defs/vec"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

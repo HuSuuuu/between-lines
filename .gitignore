@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+.env*
+public/source.zip
+public/assets/anti-utopia.mp3
+public/assets/legacy-chart.json
+public/assets/legacy-lyrics.json
+public/catalog.json
+public/example.chart.json
+proof/
+verification*.json
