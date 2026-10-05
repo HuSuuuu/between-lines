@@ -112,7 +112,7 @@ if (
     seed: 20261006,
     tempo: 120,
     template: 'inset',
-    emphasis: '字里行间,自由,反乌托邦',
+    emphasis: '反乌托邦,愿望,词句',
   });
   validateChart(updated);
   if (checkClearance(updated)) throw Error('Generated text overlaps route');
