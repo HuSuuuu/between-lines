@@ -168,7 +168,7 @@ function inspectChart(value: unknown) {
       typeof group.text !== 'string' ||
       !Array.isArray(group.glyphs) ||
       !['horizontal', 'vertical'].includes(group.orientation) ||
-      !['body', 'hero'].includes(group.role)
+      !['body', 'hero', 'fill'].includes(group.role)
     )
       throw Error('文字组无效');
     if (group.glyphs.map((g) => g.text).join('') !== group.text)

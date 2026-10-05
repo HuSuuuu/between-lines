@@ -324,7 +324,7 @@
           "type": "string"
         },
         "role": {
-          "enum": ["body", "hero"]
+          "enum": ["body", "hero", "fill"]
         },
         "orientation": {
           "enum": ["horizontal", "vertical"]

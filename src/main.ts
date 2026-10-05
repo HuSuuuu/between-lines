@@ -125,8 +125,7 @@ function show(page: string) {
     $(id).hidden = id !== page;
   layout();
   if (page === 'library') void renderLibrary();
-  if (page === 'cover')
-    $('coverCount').textContent = entries.length + ' 篇作品 · 导入自己的音乐与歌词';
+  if (page === 'cover') $('coverCount').textContent = entries.length + ' 篇';
   if (page === 'work') void renderWork();
   if (page === 'game' && engine && renderer) {
     cancelAnimationFrame(frameId);
@@ -251,7 +250,7 @@ async function renderWork() {
           c.id === 'anti-utopia-original'
             ? '原始单球'
             : c.id === 'anti-utopia-duet'
-              ? '双球字群'
+              ? '双球词云'
               : c.title === entry.title
                 ? '谱面 ' + (i + 1)
                 : c.title,

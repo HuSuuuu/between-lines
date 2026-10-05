@@ -497,7 +497,7 @@ footer button {
   font: 9px monospace;
 }
 .book-spread.flipping {
-  animation: page-turn 0.24s ease-out;
+  animation: page-turn 0.52s cubic-bezier(0.19, 1, 0.22, 1);
 }
 @keyframes page-turn {
   from {
@@ -1773,4 +1773,53 @@ body[data-compact='true'] .work-middle > #practicePicker {
   margin: 12px auto 0;
   font-size: 11px;
   color: #888;
+}
+
+/* Brief, eased motion in the paper layers; music and judgments keep their own clock. */
+.screen:not([hidden]) > main {
+  animation: paper-open 650ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.screen:not([hidden]) > main.flipping {
+  animation: page-turn 520ms cubic-bezier(0.19, 1, 0.22, 1);
+}
+.game-screen > main,
+#game > .game-layout {
+  animation: none;
+}
+@keyframes paper-open {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.primary {
+  transition:
+    background 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.primary:active {
+  transform: scale(0.985);
+}
+.contents > button {
+  transition:
+    background 350ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 400ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.contents > button:hover {
+  transform: translateX(4px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen:not([hidden]) > main,
+  .screen:not([hidden]) > main.flipping,
+  .book-spread.flipping {
+    animation: none;
+  }
+  .primary,
+  .contents > button {
+    transition: none;
+  }
 }

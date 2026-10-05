@@ -8,7 +8,7 @@
 - tracks：id 0 和 1，各有 `{t,x,y}` 关键帧，覆盖 0 到 duration；每段长度必须等于 speed×时间差。第二条路线只在 duet 区间显示。
 - duets：`{id,start,end}`。区间不能重叠，两个球在 start/end 必须位于同一点。
 - forks：关联一个 swipe 事件，含起止时间、两个方向及 keysA/keysB；两条路同长同时间并汇合；新生成的路线在起点之后共用 80ms 的直行段，供同拍手势完成选择而不使球瞬移。首版不允许岔路与双球区间或相邻 420ms 内的另一操作冲突。
-- groups：完整文字组，保留 text、role、orientation、section 和 glyphs；每个字形含 text/x/y/size。body 字形拼接必须保留完整歌词句。
+- groups：完整文字组，保留 text、role、orientation、section 和 glyphs；每个字形含 text/x/y/size。role 为 body / hero / fill：body 保留原歌词完整句，hero 为重点大词，fill 为允许重复的填缝词组。每组字形拼接必须与 text 一致。
 - lyrics：`{id,text,t?}`，LRC 可以带时间，普通文本没有时间也能生成。
 - chapters：段落起止与锚点；template 为 horizontal/vertical/inset。
 

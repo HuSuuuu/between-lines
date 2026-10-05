@@ -1,3 +1,4 @@
+import { cloudLayout } from './cloud-layout';
 import type {
   Chart,
   GenerationRequest,
@@ -8,15 +9,7 @@ import type {
   Fork,
   Chapter,
 } from './types';
-import {
-  distance,
-  FORK_INPUT_GRACE,
-  position,
-  reflect,
-  seeded,
-  chartRevision,
-  rectangleTouchesSegment,
-} from './geometry';
+import { distance, FORK_INPUT_GRACE, position, reflect, seeded, chartRevision } from './geometry';
 const round = (n: number) => Math.round(n * 1e6) / 1e6;
 export function estimateTempo(events: Note[]): number {
   const d = events
@@ -205,151 +198,5 @@ export function generate(req: GenerationRequest): Chart {
   return chart;
 }
 export function layout(chart: Chart, emphasis = ''): TextGroup[] {
-  const compositionRandom = seeded(chart.seed ^ 0x1bd11bda);
-  const edges: [Vec, Vec][] = [];
-  for (const track of chart.tracks)
-    for (let i = 1; i < track.keys.length; i++) {
-      if (
-        track.id === 1 &&
-        !chart.duets.some((d) => track.keys[i - 1].t >= d.start && track.keys[i].t <= d.end)
-      )
-        continue;
-      edges.push([track.keys[i - 1], track.keys[i]]);
-    }
-  for (const f of chart.forks)
-    for (let i = 1; i < f.keysB.length; i++) edges.push([f.keysB[i - 1], f.keysB[i]]);
-  const groups: TextGroup[] = [],
-    occupied: { x: number; y: number; size: number }[] = [];
-  const fits = (x: number, y: number, size: number) =>
-    !edges.some(([a, b]) => rectangleTouchesSegment(x, y, size * 0.52 + 0.18, a, b)) &&
-    !occupied.some(
-      (q) =>
-        Math.abs(q.x - x) < (q.size + size) * 0.5 + 0.025 &&
-        Math.abs(q.y - y) < (q.size + size) * 0.5 + 0.025,
-    );
-  const bodyLines = chart.lyrics.length ? chart.lyrics : [{ id: 'blank', text: chart.title }];
-  chart.chapters.forEach((chapter, si) => {
-    let lines = bodyLines.filter((l, i) =>
-      l.t !== undefined
-        ? l.t >= chapter.start &&
-          (l.t < chapter.end || (si === chart.chapters.length - 1 && l.t === chapter.end))
-        : (chart.duration * i) / bodyLines.length >= chapter.start &&
-          (chart.duration * i) / bodyLines.length < chapter.end,
-    );
-    if (!lines.length && chart.lyrics.length) lines = [];
-    const center = position(chart.tracks[0].keys, (chapter.start + chapter.end) / 2);
-    const orientation =
-      chart.template === 'vertical' || (chart.template === 'inset' && si % 3 === 1)
-        ? 'vertical'
-        : 'horizontal';
-    const candidates = emphasis
-      .split(/[，,\n]/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const chosen =
-      candidates[si % candidates.length] ||
-      lines.find((l) => Array.from(l.text).length <= 6)?.text ||
-      (si === 0 ? chart.title : '');
-    if (chosen) {
-      const text = chosen;
-      placeBlock(
-        'hero-' + si,
-        text,
-        'hero',
-        orientation,
-        si,
-        center,
-        si % 3 === 0 ? 1.65 : 1.4,
-        Math.min(4, Array.from(text).length),
-        1,
-      );
-    }
-    // Place each complete sentence as one tight block. Shift the whole block when a road crosses it.
-    for (let li = 0; li < lines.length; li++) {
-      const line = lines[li],
-        anchor = position(
-          chart.tracks[0].keys,
-          line.t ??
-            chapter.start +
-              ((li + 0.5) / Math.max(1, lines.length)) * (chapter.end - chapter.start),
-        );
-      placeBlock(
-        line.id + '-' + si,
-        line.text,
-        'body',
-        orientation,
-        si,
-        anchor,
-        0.84,
-        3,
-        li % 2 ? 1 : -1,
-      );
-    }
-  });
-  return groups;
-  function placeBlock(
-    id: string,
-    text: string,
-    role: TextGroup['role'],
-    orientation: TextGroup['orientation'],
-    section: number,
-    anchor: Vec,
-    size: number,
-    columns: number,
-    side: number,
-  ) {
-    const chars = Array.from(text);
-    if (role === 'body' && chars.length > 4 && chars.length % columns === 1) {
-      columns = chars.length % 4 !== 1 ? 4 : 5;
-    }
-    const rows = Math.ceil(chars.length / Math.max(1, columns)),
-      pitch = size * 1.01;
-    const local = chars.map((text, i) => ({
-      text,
-      x: (orientation === 'horizontal' ? i % columns : Math.floor(i / rows)) * pitch,
-      y: (orientation === 'horizontal' ? Math.floor(i / columns) : i % rows) * pitch,
-      size,
-    }));
-    const width = Math.max(...local.map((g) => g.x), 0) + size,
-      height = Math.max(...local.map((g) => g.y), 0) + size;
-    const desired = {
-      x:
-        (side < 0 ? anchor.x - width - 0.38 : anchor.x + 0.42) + (compositionRandom() - 0.5) * 0.35,
-      y: anchor.y - height * 0.48 + (compositionRandom() - 0.5) * 0.5,
-    };
-    const candidates: Vec[] = [];
-    for (let dy = -3; dy <= 3; dy += 0.18)
-      for (let dx = -3; dx <= 3; dx += 0.18)
-        candidates.push({ x: desired.x + dx, y: desired.y + dy });
-    candidates.sort(
-      (a, b) =>
-        Math.hypot(a.x - desired.x, a.y - desired.y) - Math.hypot(b.x - desired.x, b.y - desired.y),
-    );
-    for (const origin of candidates) {
-      const glyphs = local.map((g) => ({
-        ...g,
-        x: round(g.x + origin.x),
-        y: round(g.y + origin.y),
-      }));
-      if (glyphs.every((g) => fits(g.x, g.y, g.size))) {
-        glyphs.forEach((g) => occupied.push(g));
-        groups.push({ id, text, role, orientation, glyphs, section });
-        return;
-      }
-    }
-    // A sentence can move into the outer margin, but its letters never scatter across a road.
-    for (let shift = 3; shift < 100; shift += 0.7) {
-      const glyphs = local.map((g) => ({
-        ...g,
-        x: round(g.x + desired.x + side * shift),
-        y: round(g.y + desired.y),
-      }));
-      if (glyphs.every((g) => fits(g.x, g.y, g.size))) {
-        glyphs.forEach((g) => occupied.push(g));
-        groups.push({ id, text, role, orientation, glyphs, section });
-        return;
-      }
-    }
-    throw Error('文字组无法完整排入地图，请缩短重点词句或更换构图');
-  }
+  return cloudLayout(chart, emphasis);
 }

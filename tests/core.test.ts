@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { generate } from '../src/generator';
 import { Engine } from '../src/engine';
 import { validateChart, checkClearance } from '../src/validate';
-import { position, distance, forkDecisionEnd } from '../src/geometry';
+import { position, distance, forkDecisionEnd, pointSegment } from '../src/geometry';
 import { parseLyrics, lyricsAsLrc } from '../src/lyrics';
 import type { Chart, GenerationRequest, Entry } from '../src/types';
 const catalog = JSON.parse(fs.readFileSync('public/catalog.json', 'utf8')) as { entries: Entry[] };
@@ -39,6 +39,32 @@ describe('deterministic authoring and typography', () => {
     );
     for (const g of a.groups.filter((g) => g.role === 'body'))
       expect(g.glyphs.map((v) => v.text).join('')).toBe(g.text);
+  });
+  it('packs repeated lyric words densely around routes without losing the originals', () => {
+    const chart = generate(request);
+    const fill = chart.groups.filter((g) => g.role === 'fill');
+    expect(fill.length).toBeGreaterThan(150);
+    expect(new Set(fill.map((g) => g.text)).size).toBeLessThan(fill.length / 2);
+    const glyphs = chart.groups.flatMap((g) => g.glyphs);
+    const sizes = glyphs.map((g) => g.size);
+    expect(Math.max(...sizes) / Math.min(...sizes)).toBeGreaterThan(7);
+    const edges = chart.tracks.flatMap((track) =>
+      track.keys.slice(1).map((b, i) => [track.keys[i], b] as const),
+    );
+    for (const t of [1, 9, 18, 28]) {
+      const center = position(chart.tracks[0].keys, t);
+      let available = 0,
+        filled = 0;
+      for (let y = center.y - 4; y < center.y + 4; y += 0.25)
+        for (let x = center.x - 4; x < center.x + 4; x += 0.25) {
+          if (edges.some(([a, b]) => pointSegment({ x, y }, a, b) < 0.25)) continue;
+          available++;
+          if (glyphs.some((g) => Math.abs(g.x - x) < g.size / 2 && Math.abs(g.y - y) < g.size / 2))
+            filled++;
+        }
+      expect(filled / available).toBeGreaterThan(0.5);
+    }
+    expect(checkClearance(chart)).toBe(0);
   });
   it('regeneration changes composition, not captured input or timing', () => {
     const a = generate(request),

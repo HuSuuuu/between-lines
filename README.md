@@ -48,7 +48,7 @@ IndexedDB 保存音乐、草稿、曲库、设置和成绩。安装完成的 Ser
 
 - `src/engine.ts`：显式节奏判定与分支选择，不从几何拐角猜测节奏。
 - `src/audio.ts` / `src/input.ts`：音乐输出时钟、音效与多指生命周期。
-- `src/generator.ts` / Worker：确定性路线与完整词句字群，保留输入时间。
+- `src/generator.ts` / Worker：确定性路线与密铺宋体词云，保留输入时间；原歌词完整保留，大词、中词、小词重复嵌合填满视野。
 - `src/editor.ts` / `src/main.ts`：创作闭环、书籍导航、设置与结果。
 - `src/store.ts` / `src/packages.ts`：本机保存、可移植谱包与资源校验。
 - `src/legacy.ts`：旧版 v10 谱面适配，保留原始时间与路线。

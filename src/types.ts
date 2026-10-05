@@ -14,7 +14,7 @@ export type Glyph = Vec & { text: string; size: number };
 export type TextGroup = {
   id: string;
   text: string;
-  role: 'body' | 'hero';
+  role: 'body' | 'hero' | 'fill';
   orientation: 'horizontal' | 'vertical';
   glyphs: Glyph[];
   section: number;
